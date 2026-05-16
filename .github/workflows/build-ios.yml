@@ -19,8 +19,10 @@ jobs:
 
       - name: Install XcodeGen & Generate
         run: |
-          brew install xcodegen
-          xcodegen generate
+          curl -L -o /tmp/xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.42.0/xcodegen.zip
+          unzip -q /tmp/xcodegen.zip -d /tmp/xcodegen-bin/
+          chmod +x /tmp/xcodegen-bin/xcodegen
+          /tmp/xcodegen-bin/xcodegen generate
           # Fix objectVersion for Xcode 15.4 (new xcodegen defaults to Xcode 16 format)
           sed -i '' 's/objectVersion = 77;/objectVersion = 57;/' ClassroomCast.xcodeproj/project.pbxproj
 
