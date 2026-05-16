@@ -1,0 +1,48 @@
+#!/bin/bash
+set -e
+
+INSTALL_DIR=/opt/classroom-cast
+LAUNCHER=/usr/local/bin/classroom-cast
+DESKTOP_FILE=/usr/share/applications/classroom-cast.desktop
+ICON_FILE=/usr/share/icons/hicolor/scalable/apps/classroom-cast.svg
+
+# Remove config and logs for ALL users
+for home in /home/* /root; do
+    config_dir="$home/.config/classroom-cast"
+    if [ -d "$config_dir" ]; then
+        rm -rf "$config_dir"
+    fi
+done
+
+# Remove desktop shortcuts from every user's desktop
+DESKTOP_FILE_SRC=/usr/share/applications/classroom-cast.desktop
+for d in /home/*/Desktop /home/*/桌面 /root/Desktop; do
+    if [ -f "$d/classroom-cast.desktop" ]; then
+        rm -f "$d/classroom-cast.desktop"
+    fi
+done
+
+# Remove launcher symlink
+if [ -f "$LAUNCHER" ]; then
+    rm -f "$LAUNCHER"
+fi
+
+# Remove desktop entry and icon (dpkg tracks these but clean up if they leaked)
+if [ -f "$DESKTOP_FILE" ]; then
+    rm -f "$DESKTOP_FILE"
+fi
+if [ -f "$ICON_FILE" ]; then
+    rm -f "$ICON_FILE"
+fi
+
+# Remove main app directory if anything remains
+if [ -d "$INSTALL_DIR" ]; then
+    rm -rf "$INSTALL_DIR"
+fi
+
+# Update desktop database
+if command -v update-desktop-database &>/dev/null; then
+    update-desktop-database /usr/share/applications 2>/dev/null || true
+fi
+
+exit 0

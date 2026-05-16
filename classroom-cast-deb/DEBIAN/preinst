@@ -1,0 +1,71 @@
+#!/bin/bash
+# preinst — runs BEFORE dpkg unpacks the new package
+#
+# CRITICAL:  NEVER call "dpkg -r" or "dpkg -P" from within a maintainer
+# script.  The outer dpkg holds the database lock, so any nested dpkg
+# call hangs forever.  Instead we manipulate the dpkg database directly.
+#
+# This is safe because:
+#   - The outer dpkg hasn't touched the old package yet
+#   - We only remove /var/lib/dpkg/info/ files and the status stanza
+#   - Once the status entry is gone, dpkg treats it as a fresh install
+# =============================================================
+
+INSTALL_DIR=/opt/classroom-cast
+LAUNCHER=/usr/local/bin/classroom-cast
+PKG=classroom-cast
+
+# Force-stop any running processes
+if command -v pkill &>/dev/null; then
+    pkill -9 "classroom-cast" 2>/dev/null || true
+    pkill -9 -f "uxplay" 2>/dev/null || true
+fi
+sleep 1
+
+# ----- Step 1: nuke dpkg info files ---------------------------------
+# Once these are gone, dpkg cannot run any old maintainer scripts.
+rm -f /var/lib/dpkg/info/${PKG}.* 2>/dev/null || true
+rm -f /var/lib/dpkg/info/${PKG}-deb.* 2>/dev/null || true
+
+# ----- Step 2: remove the package stanza from dpkg status database --
+# This is the ONLY reliable way to handle "状态极不稳定".  If the status
+# entry is corrupted, dpkg refuses to touch the package at all —
+# even the preinst would not run under normal circumstances.
+#
+# HOWEVER: the outer dpkg loads the status into memory at startup,
+# then runs this preinst.  Editing the on-disk status file here works
+# because dpkg writes its in-memory state back AFTER the preinst exits.
+# So the stanza we remove here stays gone.
+if [ -f /var/lib/dpkg/status ]; then
+    cp /var/lib/dpkg/status /var/lib/dpkg/status.preinst-backup 2>/dev/null || true
+
+    # Use python3 instead of awk (UOS may not have awk installed)
+    python3 -c "
+import re
+with open('/var/lib/dpkg/status', 'r') as f:
+    content = f.read()
+for pkg in ['classroom-cast', 'classroom-cast-deb']:
+    content = re.sub(r'Package: ' + pkg + r'\n.*?(?=\nPackage: |\Z)', '', content, count=1, flags=re.DOTALL)
+with open('/var/lib/dpkg/status', 'w') as f:
+    f.write(content)
+" 2>/dev/null || true
+fi
+
+# ----- Step 3: remove every file the old package could have placed ---
+rm -rf "$INSTALL_DIR" 2>/dev/null || true
+rm -f "$LAUNCHER" 2>/dev/null || true
+rm -f /usr/share/applications/${PKG}.desktop 2>/dev/null || true
+rm -f /usr/share/icons/hicolor/scalable/apps/${PKG}.svg 2>/dev/null || true
+
+# Clean up user config
+for home in /home/* /root; do
+    config_dir="$home/.config/${PKG}"
+    [ -d "$config_dir" ] && rm -rf "$config_dir" 2>/dev/null || true
+done
+
+# Remove desktop shortcuts
+for d in /home/*/Desktop /home/*/桌面 /root/Desktop; do
+    [ -f "$d/${PKG}.desktop" ] && rm -f "$d/${PKG}.desktop" 2>/dev/null || true
+done
+
+exit 0

@@ -1,0 +1,63 @@
+#!/bin/bash
+set -e
+
+INSTALL_DIR=/opt/classroom-cast
+VENV_DIR=$INSTALL_DIR/venv
+LAUNCHER=/usr/local/bin/classroom-cast
+
+echo "班级投屏: 正在配置离线Python环境..."
+
+# Create virtual environment if it doesn't exist
+if [ ! -d "$VENV_DIR" ]; then
+    python3 -m venv "$VENV_DIR"
+fi
+
+# Upgrade pip first — UOS V20 ships pip 18.1 which doesn't recognize manylinux2014 tags
+"$VENV_DIR/bin/pip" install --no-index --find-links "$INSTALL_DIR/python-wheels" --upgrade pip 2>/dev/null || true
+
+# Detect Python version for compatible wheel selection
+PYTHON_VER=$("$VENV_DIR/bin/python" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+
+# Base packages (common to all Python versions)
+BASE_PKGS="pyqt5_qt5 PyQt5 pyqt5_sip aiohttp aiosignal attrs frozenlist multidict yarl pillow qrcode cffi pycparser cryptography zeroconf ifaddr"
+
+if [ "$PYTHON_VER" = "3.7" ]; then
+    # UOS V20 (Python 3.7)
+    "$VENV_DIR/bin/pip" install --no-index --find-links "$INSTALL_DIR/python-wheels" \
+        $BASE_PKGS 2>/dev/null || \
+    "$VENV_DIR/bin/pip" install --no-index --find-links "$INSTALL_DIR/python-wheels" \
+        $BASE_PKGS
+else
+    # UOS V23+ (Python 3.8+, e.g. 3.11) — includes extra deps needed by newer aiohttp
+    "$VENV_DIR/bin/pip" install --no-index --find-links "$INSTALL_DIR/python-wheels" \
+        $BASE_PKGS aiohappyeyeballs propcache 2>/dev/null || \
+    "$VENV_DIR/bin/pip" install --no-index --find-links "$INSTALL_DIR/python-wheels" \
+        $BASE_PKGS aiohappyeyeballs propcache
+fi
+
+# Make launcher and uxplay wrapper executable
+chmod 755 "$LAUNCHER"
+
+UXPLAY_DIR=$INSTALL_DIR/uxplay-libs
+if [ -f "$UXPLAY_DIR/run-uxplay" ]; then
+    chmod 755 "$UXPLAY_DIR/run-uxplay"
+    echo "班级投屏: Uxplay (AirPlay) 已就绪（V20/V23 兼容）"
+fi
+
+echo "班级投屏: 安装完成！"
+echo "请在启动菜单中搜索「班级投屏」启动，或在终端执行: classroom-cast"
+
+# Register desktop entry (update MIME cache if possible)
+if command -v update-desktop-database &>/dev/null; then
+    update-desktop-database /usr/share/applications 2>/dev/null || true
+fi
+
+# Copy desktop shortcut to all users' desktops
+DESKTOP_FILE=/usr/share/applications/classroom-cast.desktop
+for d in /home/*/Desktop /home/*/桌面 /root/Desktop; do
+    if [ -d "$d" ] && [ ! -f "$d/classroom-cast.desktop" ]; then
+        cp "$DESKTOP_FILE" "$d/" 2>/dev/null || true
+    fi
+done
+
+exit 0

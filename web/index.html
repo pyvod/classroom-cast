@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>班级投屏</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+    color: #c9d1d9;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .container {
+    text-align: center;
+    padding: 40px 20px;
+    max-width: 500px;
+  }
+  .logo {
+    font-size: 64px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #f0f6fc;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    font-size: 16px;
+    color: #8b949e;
+    margin-bottom: 40px;
+  }
+  .card {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 20px;
+  }
+  .ip-display {
+    font-size: 32px;
+    font-weight: bold;
+    color: #58a6ff;
+    margin: 16px 0;
+    letter-spacing: 2px;
+  }
+  .hint {
+    font-size: 14px;
+    color: #8b949e;
+    margin-top: 12px;
+  }
+  .btn {
+    display: inline-block;
+    background: #238636;
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    padding: 16px 48px;
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: #2ea043; }
+  .btn:active { background: #1a7a31; }
+  .scan-hint {
+    margin-top: 24px;
+    font-size: 14px;
+    color: #484f58;
+  }
+  .steps {
+    text-align: left;
+    margin: 24px 0;
+    padding: 0;
+    list-style: none;
+  }
+  .steps li {
+    padding: 8px 0;
+    font-size: 15px;
+    color: #c9d1d9;
+    border-bottom: 1px solid #30363d;
+  }
+  .steps li:last-child { border-bottom: none; }
+  .steps .step-num {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    background: #1f6feb;
+    color: #fff;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: bold;
+    margin-right: 12px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">📱</div>
+  <h1>班级投屏</h1>
+  <p class="subtitle">统信UOS 班级大屏投屏系统</p>
+
+  <div class="card">
+    <p style="color:#8b949e;margin-bottom:8px;">连接服务器</p>
+    <div class="ip-display" id="serverIp">检测中...</div>
+  </div>
+
+  <a class="btn" href="/cast">开始投屏</a>
+
+  <div class="scan-hint">
+    手机和大屏请连接同一WiFi网络
+  </div>
+
+  <ul class="steps">
+    <li><span class="step-num">1</span>确保手机连接了教室 WiFi</li>
+    <li><span class="step-num">2</span>点击上方「开始投屏」按钮</li>
+    <li><span class="step-num">3</span>在弹出的提示中点击「允许」并选择「屏幕共享」</li>
+  </ul>
+</div>
+
+<script>
+async function fetchServerInfo() {
+  try {
+    const resp = await fetch('/api/info');
+    const data = await resp.json();
+    document.getElementById('serverIp').textContent = data.ip || '未知';
+  } catch(e) {
+    document.getElementById('serverIp').textContent = '无法获取';
+  }
+}
+fetchServerInfo();
+</script>
+</body>
+</html>

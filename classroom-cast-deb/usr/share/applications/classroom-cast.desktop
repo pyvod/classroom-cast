@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=班级投屏
+Comment=将手机屏幕投射到大屏一体机
+GenericName=投屏工具
+Exec=/usr/local/bin/classroom-cast
+Icon=classroom-cast
+Terminal=false
+Type=Application
+Categories=Education;Network;
+StartupNotify=true

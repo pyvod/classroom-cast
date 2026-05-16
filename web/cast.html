@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>班级投屏</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+    color: #c9d1d9;
+    min-height: 100vh;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .container { padding: 20px 16px; max-width: 500px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; color: #f0f6fc; text-align: center; margin-bottom: 6px; }
+  .device-info {
+    font-size: 13px; color: #8b949e; text-align: center;
+    padding: 10px; background: #21262d; border-radius: 8px; margin-bottom: 16px;
+  }
+
+  /* Mode selection tabs */
+  .mode-tabs {
+    display: flex; gap: 8px; margin-bottom: 16px;
+    background: #21262d; border-radius: 12px; padding: 4px;
+  }
+  .mode-tab {
+    flex: 1; padding: 12px 8px; border: none; border-radius: 10px;
+    background: transparent; color: #8b949e; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; text-align: center;
+  }
+  .mode-tab.active {
+    background: #1f6feb; color: #ffffff;
+  }
+  .mode-tab:active { transform: scale(0.96); }
+
+  /* Common card */
+  .card {
+    background: #21262d; border: 1px solid #30363d;
+    border-radius: 12px; padding: 20px; margin-bottom: 12px;
+  }
+  .card h3 { color: #f0f6fc; font-size: 16px; margin-bottom: 12px; }
+  .card p, .card li { color: #8b949e; font-size: 14px; line-height: 1.7; }
+  .card ol { padding-left: 20px; }
+  .card ol li { margin-bottom: 6px; }
+
+  /* Buttons */
+  .btn-primary {
+    background: #238636; color: #ffffff; border: none; border-radius: 12px;
+    padding: 16px 40px; font-size: 18px; font-weight: 600; cursor: pointer;
+    width: 100%; max-width: 320px; transition: background 0.2s;
+  }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-primary:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+
+  .btn-danger {
+    background: #da3633; color: #fff; border: none; border-radius: 12px;
+    padding: 16px 40px; font-size: 18px; font-weight: 600; cursor: pointer;
+    width: 100%; max-width: 320px;
+  }
+  .btn-danger:hover { background: #f85149; }
+
+  .btn-secondary {
+    background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 8px;
+    padding: 12px 24px; font-size: 15px; cursor: pointer; width: 100%;
+  }
+  .btn-secondary:hover { background: #30363d; }
+
+  .hidden { display: none !important; }
+
+  .status {
+    margin-top: 12px; padding: 10px; border-radius: 8px; font-size: 14px; text-align: center;
+  }
+  .status-connecting { background: #1f6feb22; color: #58a6ff; border: 1px solid #1f6feb44; }
+  .status-connected  { background: #23863622; color: #3fb950; border: 1px solid #23863644; }
+  .status-error      { background: #da363322; color: #f85149; border: 1px solid #da363344; }
+  .status-idle       { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+
+  /* Camera preview */
+  #preview {
+    width: 100%; border-radius: 8px; margin-top: 12px;
+    border: 2px solid #30363d; display: none; background: #000;
+  }
+  video.camera-feed {
+    width: 100%; border-radius: 8px; margin-top: 12px;
+    border: 2px solid #30363d; background: #000;
+  }
+  .flex-center { display: flex; flex-direction: column; align-items: center; }
+  .icon-big { font-size: 48px; margin-bottom: 8px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .badge {
+    display: inline-block; background: #1f6feb33; color: #58a6ff;
+    border: 1px solid #1f6feb44; border-radius: 4px; padding: 2px 8px;
+    font-size: 11px; vertical-align: middle; margin-left: 4px;
+  }
+  /* File input styling */
+  .file-input-area {
+    border: 2px dashed #30363d; border-radius: 12px; padding: 32px 16px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    background: #0d1117; margin-top: 12px;
+  }
+  .file-input-area:hover { border-color: #58a6ff; background: #161b22; }
+  .file-input-area input { display: none; }
+
+  /* Camera controls - capture + stop side by side */
+  .camera-controls {
+    display: flex; gap: 10px; width: 100%; max-width: 320px;
+  }
+  .camera-controls button {
+    flex: 1; border: none; border-radius: 12px; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; padding: 14px; transition: all 0.2s;
+  }
+  .btn-capture {
+    background: #1f6feb; color: #ffffff;
+  }
+  .btn-capture:active { background: #388bfd; transform: scale(0.96); }
+  .btn-stop {
+    background: #21262d; color: #f85149; border: 1px solid #f85149 !important;
+  }
+  .btn-stop:active { background: #f85149; color: #fff; transform: scale(0.96); }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📱 班级投屏</h1>
+  <div class="device-info" id="serverInfo">正在连接服务器...</div>
+
+  <!-- Mode selection -->
+  <div class="mode-tabs" id="modeTabs">
+    <button class="mode-tab active" data-mode="screen" onclick="switchMode('screen')">屏幕共享</button>
+    <button class="mode-tab" data-mode="camera" onclick="switchMode('camera')">实物展台</button>
+    <button class="mode-tab" data-mode="photo" onclick="switchMode('photo')">拍照上传</button>
+    <button class="mode-tab" data-mode="url" onclick="switchMode('url')">网址推送</button>
+  </div>
+
+  <!-- ========== SCREEN SHARE ========== -->
+  <div class="section active flex-center" id="sectionScreen">
+    <div class="card" style="width:100%;">
+      <h3>📲 屏幕共享</h3>
+      <button class="btn-primary" id="btnStart" onclick="startCast()">开始投屏</button>
+      <button class="btn-danger hidden" id="btnStop" onclick="stopCast()">停止投屏</button>
+      <div class="status status-idle" id="statusScreen">点击上方按钮开始投屏</div>
+      <img id="previewScreen" alt="投屏预览">
+      <div id="iosNotice" class="hidden" style="margin-top:12px;padding:12px;background:#da363322;border-radius:8px;border:1px solid #da363344;">
+        <p style="color:#f85149;font-size:14px;">
+          ⚠️ iOS 不支持网页屏幕共享。<br>
+          请使用「实物展台」或「拍照上传」功能。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== DOCUMENT CAMERA ========== -->
+  <div class="section flex-center" id="sectionCamera">
+    <div class="card" style="width:100%;">
+      <h3>📷 实物展台</h3>
+      <p style="color:#8b949e;margin-bottom:12px;">用手机摄像头拍摄课本/试卷，实时显示在大屏上</p>
+      <button class="btn-primary" id="btnCameraStart" onclick="startCamera()">📷 开启摄像头</button>
+      <div class="camera-controls hidden" id="cameraControls">
+        <button class="btn-capture" id="btnCameraCapture" onclick="captureSnapshot()">
+          <span style="font-size:24px;margin-bottom:4px;">📸</span>
+          <span style="font-size:13px;">截图</span>
+        </button>
+        <button class="btn-stop" id="btnCameraStop" onclick="stopCamera()">
+          <span style="font-size:20px;margin-bottom:4px;">⏹</span>
+          <span style="font-size:13px;">停止</span>
+        </button>
+      </div>
+      <video class="camera-feed hidden" id="cameraFeed" autoplay playsinline muted></video>
+      <div class="status status-idle" id="statusCamera">点击开启摄像头</div>
+    </div>
+  </div>
+
+  <!-- ========== PHOTO UPLOAD ========== -->
+  <div class="section flex-center" id="sectionPhoto">
+    <div class="card" style="width:100%;">
+      <h3>🖼️ 照片上传</h3>
+      <p style="color:#8b949e;margin-bottom:12px;">拍照或选择照片，发送到大屏显示。<br>支持多张照片，大屏端可翻页浏览。</p>
+
+      <div class="file-input-area" id="photoDropzone" onclick="document.getElementById('photoInput').click()">
+        <div style="font-size:40px;margin-bottom:8px;">📸</div>
+        <p style="color:#f0f6fc;font-weight:600;">点击拍照或选择照片</p>
+        <p style="color:#8b949e;font-size:13px;margin-top:4px;">支持 JPG / PNG，可多选</p>
+        <input type="file" accept="image/*" multiple id="photoInput">
+      </div>
+
+      <div id="photoPreview" class="hidden" style="margin-top:12px;">
+        <div id="photoPreviewList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;"></div>
+        <button class="btn-primary" id="btnPhotoSend" onclick="sendPhotos()">
+          发送选中的照片
+        </button>
+        <button class="btn-secondary" id="btnPhotoAddMore" style="margin-top:8px;" onclick="document.getElementById('photoInput').click()">
+          + 继续添加照片
+        </button>
+      </div>
+
+      <div id="photoSentList" class="hidden" style="margin-top:12px;">
+        <div style="background:#23863622;border:1px solid #23863644;border-radius:8px;padding:12px;margin-bottom:8px;">
+          <p style="color:#3fb950;font-weight:600;" id="photoSentCount">✅ 已发送 0 张照片</p>
+          <p style="color:#8b949e;font-size:13px;">大屏端可翻页浏览</p>
+        </div>
+        <button class="btn-secondary" onclick="resetPhotoUpload()">继续上传照片</button>
+      </div>
+
+      <div class="status status-idle" id="statusPhoto"></div>
+    </div>
+  </div>
+
+  <!-- ========== URL PUSH ========== -->
+  <div class="section flex-center" id="sectionUrl">
+    <div class="card" style="width:100%;">
+      <h3>🌐 网址推送</h3>
+      <p style="color:#8b949e;margin-bottom:12px;">输入网址，大屏自动打开</p>
+      <input type="url" id="urlInput" placeholder="输入网址，如 https://example.com"
+        style="width:100%;padding:14px;background:#0d1117;border:1px solid #30363d;border-radius:8px;
+               color:#c9d1d9;font-size:16px;margin-bottom:12px;">
+      <button class="btn-primary" onclick="pushUrl()" style="padding:14px;">推送到大屏</button>
+      <div class="status status-idle" id="statusUrl"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/cast.js"></script>
+<script>
+// Mode switching
+function switchMode(mode) {
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('active');
+}
+// Detect iOS on load
+setTimeout(function() {
+  var ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios) {
+    document.getElementById('iosNotice').classList.remove('hidden');
+    document.querySelector('[data-mode="screen"]').innerHTML = '屏幕共享 ⚠️';
+  }
+}, 500);
+</script>
+</body>
+</html>

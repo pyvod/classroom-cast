@@ -1,0 +1,25 @@
+# Large binaries - distributed via GitHub Releases
+classroom-cast.deb
+classroom-cast-standalone.tar.gz
+classroom-cast.apk
+*.apk
+*.whl
+*.iso
+
+# Uxplay runtime libs (200MB+, not needed in source)
+**/uxplay-libs/
+
+# Duplicate source copy at project root
+/classroom_cast/
+
+# Cleanup scripts
+cleanup-uos.*
+
+# Build artifacts
+android/app/build/
+ios/ClassroomCast.xcodeproj/
+ios/build/
+__pycache__/
+*.pyc
+.DS_Store
+*.DS_Store

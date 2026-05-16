@@ -1,0 +1,27 @@
+#!/bin/bash
+# NOTE: no set -e — this script MUST NEVER fail dpkg removal.
+# If this script exits non-zero, dpkg puts the package in a broken
+# "half-removed" state that is hard to recover from.
+
+INSTALL_DIR=/opt/classroom-cast
+
+# Kill all child processes of classroom-cast
+if command -v pkill &>/dev/null; then
+    pkill -9 "classroom-cast" 2>/dev/null || true
+    pkill -9 -f "uxplay" 2>/dev/null || true
+    pkill -9 -f "miraclecast" 2>/dev/null || true
+    pkill -9 -f "wpa_supplicant" 2>/dev/null || true
+    pkill -9 -f "dns-sd.*_airplay" 2>/dev/null || true
+    pkill -9 -f "avahi.*_airplay" 2>/dev/null || true
+fi
+
+sleep 1
+
+# Remove large directories that dpkg cannot track
+for dir in venv uxplay-libs python-wheels; do
+    if [ -d "$INSTALL_DIR/$dir" ]; then
+        rm -rf "$INSTALL_DIR/$dir" 2>/dev/null || true
+    fi
+done
+
+exit 0

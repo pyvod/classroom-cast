@@ -1,0 +1,38 @@
+name: ClassroomCast
+options:
+  bundleIdPrefix: com.classroom
+  deploymentTarget:
+    iOS: "15.0"
+  xcodeVersion: "14.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.7"
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  ClassroomCast:
+    type: application
+    platform: iOS
+    sources:
+      - ClassroomCast
+    settings:
+      base:
+        INFOPLIST_FILE: ClassroomCast/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.classroom.cast
+        TARGETED_DEVICE_FAMILY: "1,2"
+        UILaunchStoryboardName: LaunchScreen
+    info:
+      path: ClassroomCast/Info.plist
+      properties:
+        UIRequiredDeviceCapabilities: [arm64, camera]
+        NSCameraUsageDescription: "需要使用相机进行实物展台和扫码连接"
+        NSPhotoLibraryUsageDescription: "需要访问相册选择照片投屏"
+        NSLocalNetworkUsageDescription: "需要访问局域网连接投屏服务器"
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UIBackgroundModes: []
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight

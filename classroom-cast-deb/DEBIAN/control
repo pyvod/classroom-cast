@@ -1,0 +1,10 @@
+Package: classroom-cast
+Version: 1.0.0
+Section: education
+Priority: optional
+Architecture: amd64
+Depends: python3 (>= 3.7), python3-venv, python3-pip
+Maintainer: Classroom Cast <support@classroom-cast.local>
+Description: 班级投屏 - 统信UOS班级大屏一体机手机投屏软件
+ 将手机屏幕、照片、网址实时投射到大屏一体机显示。
+ 支持安卓屏幕镜像、拍照上传、网址推送、AirPlay/iOS镜像。
