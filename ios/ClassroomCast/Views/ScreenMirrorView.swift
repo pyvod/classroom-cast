@@ -22,6 +22,12 @@ struct ScreenMirrorView: View {
                 .font(.system(size: 13))
                 .foregroundColor(.gray)
 
+            Text("提示：切换到其他应用或锁屏会导致投屏中断")
+                .font(.system(size: 12))
+                .foregroundColor(.orange)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+
             Spacer().frame(height: 20)
 
             Button(action: {
@@ -40,9 +46,35 @@ struct ScreenMirrorView: View {
                     .font(.system(size: 16, weight: .semibold))
             }
             .padding(.horizontal, 20)
+
+            // Reconnect button if disconnected
+            if !isMirroring && isActive {
+                Button(action: startMirroring) {
+                    Text("重新连接")
+                        .frame(maxWidth: .infinity)
+                        .padding(14)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.blue))
+                        .foregroundColor(.blue)
+                        .cornerRadius(8)
+                }
+                .padding(.horizontal, 20)
+            }
+
             Spacer()
         }
         .padding()
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            // App going to background — iOS stops ReplayKit capture
+            if isMirroring {
+                // The capture will be stopped by iOS; update UI state
+                client.sendCastStop()
+                DispatchQueue.main.async {
+                    isMirroring = false
+                    isActive = false
+                    onStatusChange("切换到其他应用，投屏已中断")
+                }
+            }
+        }
     }
 
     private func startMirroring() {
@@ -60,7 +92,6 @@ struct ScreenMirrorView: View {
             guard type == .video,
                   let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
 
-            // Convert pixel buffer to JPEG
             let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
             let context = CIContext()
             guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }

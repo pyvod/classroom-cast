@@ -1,10 +1,9 @@
 package com.classroom.cast
 
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okio.ByteString.Companion.toByteString
 import okhttp3.MultipartBody
@@ -30,15 +29,24 @@ sealed class CastEvent {
 
 class CastClient(private val host: String, private val port: Int, private val useSsl: Boolean = false) {
 
+    // Auto-fix: iOS/Android apps use HTTP/WS, not HTTPS/WSS for streaming
+    // If port is 8443 (HTTPS default), fall back to 8080 (HTTP default)
+    private val actualPort = if (port == 8443) 8080 else port
+
     private val scheme get() = if (useSsl) "https" else "http"
     private val wsScheme get() = if (useSsl) "wss" else "ws"
-    private val baseUrl get() = "$scheme://$host:$port"
+    private val baseUrl get() = "$scheme://$host:$actualPort"
 
     private val client = buildClient()
 
     private var ws: WebSocket? = null
     private val _events = Channel<CastEvent>(Channel.BUFFERED)
     val events: Flow<CastEvent> = _events.receiveAsFlow()
+
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var pingJob: Job? = null
+    private var reconnectJob: Job? = null
+    private var isManuallyClosed = false
 
     private fun buildClient(): OkHttpClient {
         val builder = OkHttpClient.Builder()
@@ -65,7 +73,13 @@ class CastClient(private val host: String, private val port: Int, private val us
     }
 
     fun connectWs() {
-        val url = "$wsScheme://$host:$port/ws"
+        isManuallyClosed = false
+        startWs()
+        startPing()
+    }
+
+    private fun startWs() {
+        val url = "$wsScheme://$host:$actualPort/ws"
         val request = Request.Builder()
             .url(url)
             .build()
@@ -76,17 +90,50 @@ class CastClient(private val host: String, private val port: Int, private val us
             }
 
             override fun onMessage(ws: WebSocket, text: String) {
+                if (text == "PONG") return  // Keepalive response, ignore
                 _events.trySend(CastEvent.Message(text))
             }
 
             override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
                 _events.trySend(CastEvent.Error(t.message ?: "WebSocket error"))
+                scheduleReconnect()
             }
 
             override fun onClosed(ws: WebSocket, code: Int, reason: String) {
                 _events.trySend(CastEvent.Disconnected)
+                scheduleReconnect()
             }
         })
+    }
+
+    // MARK: - Keepalive PING every 10 seconds
+    private fun startPing() {
+        stopPing()
+        pingJob = scope.launch {
+            while (isActive) {
+                delay(10_000)
+                ws?.send("PING")
+            }
+        }
+    }
+
+    private fun stopPing() {
+        pingJob?.cancel()
+        pingJob = null
+    }
+
+    // MARK: - Auto-reconnect after 3 seconds
+    private fun scheduleReconnect() {
+        if (isManuallyClosed) return
+        stopPing()
+        reconnectJob?.cancel()
+        reconnectJob = scope.launch {
+            delay(3_000)
+            if (!isManuallyClosed) {
+                startWs()
+                startPing()
+            }
+        }
     }
 
     fun sendFrame(jpegData: ByteArray) {
@@ -102,6 +149,10 @@ class CastClient(private val host: String, private val port: Int, private val us
     }
 
     fun closeWs() {
+        isManuallyClosed = true
+        stopPing()
+        reconnectJob?.cancel()
+        reconnectJob = null
         ws?.close(1000, "User stopped")
         ws = null
     }
@@ -160,5 +211,10 @@ class CastClient(private val host: String, private val port: Int, private val us
 
     fun disconnect() {
         closeWs()
+    }
+
+    fun cleanup() {
+        closeWs()
+        scope.cancel()
     }
 }

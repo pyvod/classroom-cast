@@ -28,7 +28,7 @@ struct ControlView: View {
             .padding(.vertical, 12)
             .background(Color(red: 0.09, green: 0.10, blue: 0.13))
 
-            // Tab selector
+            // Tab selector (custom to avoid TabView `.page` layout issues)
             Picker("", selection: $selectedTab) {
                 Text("屏幕镜像").tag(0)
                 Text("实物展台").tag(1)
@@ -46,35 +46,40 @@ struct ControlView: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 4)
 
-            // Content
-            TabView(selection: $selectedTab) {
-                ScreenMirrorView(
-                    client: client,
-                    isActive: $isStreamActive,
-                    onStatusChange: { statusText = $0 }
-                )
-                .tag(0)
-
-                CameraView(
-                    client: client,
-                    isActive: $isCameraActive,
-                    onStatusChange: { statusText = $0 }
-                )
-                .tag(1)
-
-                PhotoUploadView(
-                    client: client,
-                    onStatusChange: { statusText = $0 }
-                )
-                .tag(2)
-
-                UrlPushView(
-                    client: client,
-                    onStatusChange: { statusText = $0 }
-                )
-                .tag(3)
+            // Content — switch tabs directly instead of TabView for better sizing
+            GeometryReader { geo in
+                ScrollView {
+                    VStack {
+                        switch selectedTab {
+                        case 0:
+                            ScreenMirrorView(
+                                client: client,
+                                isActive: $isStreamActive,
+                                onStatusChange: { statusText = $0 }
+                            )
+                        case 1:
+                            CameraView(
+                                client: client,
+                                isActive: $isCameraActive,
+                                onStatusChange: { statusText = $0 }
+                            )
+                        case 2:
+                            PhotoUploadView(
+                                client: client,
+                                onStatusChange: { statusText = $0 }
+                            )
+                        case 3:
+                            UrlPushView(
+                                client: client,
+                                onStatusChange: { statusText = $0 }
+                            )
+                        default:
+                            EmptyView()
+                        }
+                    }
+                    .frame(minHeight: geo.size.height)
+                }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
 
             // Disconnect
             Button(action: {

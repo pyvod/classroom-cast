@@ -16,10 +16,16 @@ class CastClient: NSObject, URLSessionWebSocketDelegate {
     private var ws: URLSessionWebSocketTask?
     private var session: URLSession!
     private var onEvent: ((CastEvent) -> Void)?
+    private var pingTimer: Timer?
+    private var reconnectTimer: Timer?
+    private var isManuallyClosed = false
+    private var isConnected = false
 
     init(host: String, port: Int) {
+        // iOS app uses HTTP/WS, not HTTPS/WSS. Auto-fix 8443→8080.
+        let actualPort = port == 8443 ? 8080 : port
         self.host = host
-        self.port = port
+        self.port = actualPort
         super.init()
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 10
@@ -30,6 +36,12 @@ class CastClient: NSObject, URLSessionWebSocketDelegate {
     // MARK: - WebSocket Connection
     func connectWs(onEvent: @escaping (CastEvent) -> Void) {
         self.onEvent = onEvent
+        isManuallyClosed = false
+        startWs()
+        startPing()
+    }
+
+    private func startWs() {
         let url = URL(string: "ws://\(host):\(port)/ws")!
         ws = session.webSocketTask(with: url)
         ws?.resume()
@@ -38,20 +50,59 @@ class CastClient: NSObject, URLSessionWebSocketDelegate {
 
     private func receiveMessage() {
         ws?.receive { [weak self] result in
+            guard let self = self else { return }
             switch result {
             case .success(let message):
                 switch message {
                 case .string(let text):
-                    self?.onEvent?(.message(text))
+                    if text == "PONG" {
+                        // Keepalive response received
+                    } else if text == "CLIENT_DISCONNECT" {
+                        DispatchQueue.main.async {
+                            self.onEvent?(.disconnected)
+                        }
+                    } else {
+                        self.onEvent?(.message(text))
+                    }
                 case .data:
                     break
                 @unknown default:
                     break
                 }
-                self?.receiveMessage()
+                self.receiveMessage()
             case .failure(let error):
-                self?.onEvent?(.error(error.localizedDescription))
+                DispatchQueue.main.async {
+                    self.onEvent?(.error(error.localizedDescription))
+                    self.scheduleReconnect()
+                }
             }
+        }
+    }
+
+    // MARK: - Keepalive (PING every 10 seconds)
+    private func startPing() {
+        stopPing()
+        DispatchQueue.main.async {
+            self.pingTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+                self?.sendText("PING")
+            }
+        }
+    }
+
+    private func stopPing() {
+        pingTimer?.invalidate()
+        pingTimer = nil
+    }
+
+    // MARK: - Auto-reconnect
+    private func scheduleReconnect() {
+        guard !isManuallyClosed else { return }
+        stopPing()
+        reconnectTimer?.invalidate()
+        reconnectTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { [weak self] _ in
+            guard let self = self, !self.isManuallyClosed else { return }
+            self.startWs()
+            self.startPing()
         }
     }
 
@@ -67,8 +118,13 @@ class CastClient: NSObject, URLSessionWebSocketDelegate {
     func sendCastStop() { sendText("CAST_STOP") }
 
     func closeWs() {
+        isManuallyClosed = true
+        stopPing()
+        reconnectTimer?.invalidate()
+        reconnectTimer = nil
         ws?.cancel(with: .normalClosure, reason: nil)
         ws = nil
+        isConnected = false
     }
 
     // MARK: - HTTP API
@@ -126,11 +182,16 @@ class CastClient: NSObject, URLSessionWebSocketDelegate {
 
     // MARK: - URLSessionWebSocketDelegate
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol: String?) {
+        isConnected = true
         DispatchQueue.main.async { self.onEvent?(.connected) }
     }
 
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
-        DispatchQueue.main.async { self.onEvent?(.disconnected) }
+        isConnected = false
+        DispatchQueue.main.async {
+            self.onEvent?(.disconnected)
+            self.scheduleReconnect()
+        }
     }
 
     deinit {

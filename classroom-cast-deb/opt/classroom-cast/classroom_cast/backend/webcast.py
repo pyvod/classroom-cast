@@ -189,11 +189,10 @@ class WebCastServer:
         from .network import NetworkManager
         nm = NetworkManager()
         ip = nm.primary_ip or "localhost"
-        # Use HTTPS if SSL available, HTTP otherwise
-        if self._ssl_context:
-            cast_url = f"https://{ip}:{self.ssl_port}/cast"
-        else:
-            cast_url = f"http://{ip}:{self.port}/cast"
+        # Always use HTTP for QR — mobile clients (iOS/Android) don't support
+        # HTTPS/WSS for WebSocket streaming. The SSL cert is self-signed and
+        # causes connection failures on iOS. Users can manually use 8443 if needed.
+        cast_url = f"http://{ip}:{self.port}/cast"
         return web.json_response({
             "url": cast_url,
             "ip": ip,

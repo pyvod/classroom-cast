@@ -11,22 +11,24 @@ struct CameraView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            // Camera preview
-            ZStack {
-                if camera.hasPermission {
-                    CameraPreview(session: camera.session)
-                        .frame(height: 300)
-                        .cornerRadius(12)
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3)))
-                } else {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.black)
-                        .frame(height: 300)
-                    Text("需要相机权限")
-                        .foregroundColor(.gray)
+            // Camera preview — proportional to screen width
+            GeometryReader { geo in
+                ZStack {
+                    if camera.hasPermission {
+                        CameraPreview(session: camera.session)
+                            .cornerRadius(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.gray.opacity(0.3)))
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.black)
+                        Text("需要相机权限")
+                            .foregroundColor(.gray)
+                    }
                 }
+                .frame(height: geo.size.width * 0.65)
             }
             .padding(.horizontal, 20)
+            .frame(height: UIScreen.main.bounds.width * 0.65)
 
             VStack(spacing: 20) {
                 Image(systemName: "doc.viewfinder")
@@ -70,7 +72,6 @@ struct CameraView: View {
         isActive = true
         onStatusChange("实物展台已开启")
 
-        // Start frame capture timer
         camera.onFrame = { [self] jpegData in
             client.sendFrame(jpegData)
         }
@@ -92,6 +93,7 @@ class CameraService: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
     let session = AVCaptureSession()
     var onFrame: ((Data) -> Void)?
     private var lastFrameTime: Date = .distantPast
+    private let ciContext = CIContext()  // Cache context for performance
 
     func checkPermission() {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -117,12 +119,29 @@ class CameraService: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
 
             guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
                   let input = try? AVCaptureDeviceInput(device: device) else { return }
+
+            // Configure for 1080p if available
+            if let format = device.formats.first(where: { fmt in
+                let dim = CMVideoFormatDescriptionGetDimensions(fmt.formatDescription)
+                return dim.width >= 1920 && dim.height >= 1080
+                        && fmt.videoSupportedFrameRateRanges.contains(where: { $0.maxFrameRate >= 15 })
+            }) {
+                try? device.lockForConfiguration()
+                device.activeFormat = format
+                device.unlockForConfiguration()
+            }
+
             self.session.addInput(input)
 
             let output = AVCaptureVideoDataOutput()
             output.alwaysDiscardsLateVideoFrames = true
             output.setSampleBufferDelegate(self, queue: DispatchQueue(label: "camera"))
             self.session.addOutput(output)
+
+            // Set orientation to portrait
+            if let conn = output.connection(with: .video) {
+                conn.videoOrientation = .portrait
+            }
 
             self.session.commitConfiguration()
             self.session.startRunning()
@@ -143,8 +162,7 @@ class CameraService: NSObject, ObservableObject, AVCaptureVideoDataOutputSampleB
               let onFrame = onFrame else { return }
 
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-        let context = CIContext()
-        guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
+        guard let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) else { return }
 
         let jpeg = UIImage(cgImage: cgImage, scale: 1.0, orientation: .right)
             .jpegData(compressionQuality: 0.5)
@@ -162,14 +180,17 @@ struct CameraPreview: UIViewRepresentable {
         let view = UIView()
         let layer = AVCaptureVideoPreviewLayer(session: session)
         layer.videoGravity = .resizeAspectFill
+        layer.frame = view.bounds
         view.layer.addSublayer(layer)
         return view
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
-        if let layer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
-            layer.frame = uiView.bounds
-            layer.session = session
+        DispatchQueue.main.async {
+            if let layer = uiView.layer.sublayers?.first as? AVCaptureVideoPreviewLayer {
+                layer.frame = uiView.bounds
+                layer.session = session
+            }
         }
     }
 }

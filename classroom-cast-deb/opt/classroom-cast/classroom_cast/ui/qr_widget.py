@@ -62,13 +62,10 @@ class QRWidget(QWidget):
 
         host = public_host if public_host else ip
 
-        # QR encodes active protocol: HTTPS if SSL available, HTTP otherwise
-        if https_port:
-            self._url = f"https://{host}:{https_port}/cast"
-            self._https_url = f"http://{ip}:{port}/cast" if not public_host else None
-        else:
-            self._url = f"http://{host}:{port}/cast"
-            self._https_url = None
+        # Always use HTTP for QR — mobile clients (iOS/Android) use HTTP/WS.
+        # Self-signed HTTPS certs cause connection failures on iOS.
+        self._url = f"http://{host}:{port}/cast"
+        self._https_url = None
 
         self._generate_qr()
         self._update_labels()
@@ -100,12 +97,7 @@ class QRWidget(QWidget):
             self._qr_label.setText(f"二维码生成失败\n{str(e)}")
 
     def _update_labels(self):
-        if self._https_url:
-            self._url_label.setText(
-                f"扫码: {self._url}\nHTTP备用: {self._https_url}"
-            )
-        else:
-            self._url_label.setText(f"打开: {self._url}")
+        self._url_label.setText(f"打开: {self._url}")
 
     def set_status(self, status: str):
         self._status_label.setText(status)
