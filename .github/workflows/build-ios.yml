@@ -19,8 +19,12 @@ jobs:
         run: |
           curl -L -o /tmp/xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.42.0/xcodegen.zip
           unzip -q /tmp/xcodegen.zip -d /tmp/
-          chmod +x /tmp/xcodegen/xcodegen
-          /tmp/xcodegen/xcodegen generate
+          echo "=== xcodegen files ==="
+          ls -laR /tmp/xcodegen/
+          echo "======================"
+          XCGEN=$(find /tmp/xcodegen -type f | head -1)
+          chmod +x "$XCGEN"
+          "$XCGEN" generate
           # Fix objectVersion for Xcode 15.4 (new xcodegen defaults to Xcode 16 format)
           sed -i '' 's/objectVersion = 77;/objectVersion = 57;/' ClassroomCast.xcodeproj/project.pbxproj
 
