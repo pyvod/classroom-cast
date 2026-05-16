@@ -60,8 +60,9 @@ struct UrlPushView: View {
             pushUrl = "https://" + pushUrl
         }
         onStatusChange("推送中...")
+        let finalUrl = pushUrl
         Task {
-            let ok = await client.pushUrl(pushUrl)
+            let ok = await client.pushUrl(finalUrl)
             onStatusChange(ok ? "✅ 网址已推送到大屏" : "❌ 推送失败")
             if ok { urlInput = "" }
         }
