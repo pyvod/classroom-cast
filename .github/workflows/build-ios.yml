@@ -17,13 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install XcodeGen
+      - name: Install XcodeGen & Generate
         run: |
           brew install xcodegen
-          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
-
-      - name: Generate Xcode Project
-        run: |
           xcodegen generate
           # Fix objectVersion for Xcode 15.4 (new xcodegen defaults to Xcode 16 format)
           sed -i '' 's/objectVersion = 77;/objectVersion = 57;/' ClassroomCast.xcodeproj/project.pbxproj
