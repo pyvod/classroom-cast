@@ -169,6 +169,12 @@ class WebCastServer:
         # Prevent directory traversal
         if ".." in filename or "/" in filename or not filename:
             return web.Response(text="Forbidden", status=403)
+        # Serve APK for download (e.g., classroom-cast.apk)
+        if filename.endswith(".apk"):
+            apk_path = ROOT.parent / filename
+            if apk_path.exists():
+                return web.FileResponse(apk_path)
+            return web.Response(text="APK not found", status=404)
         filepath = ROOT / filename
         if filepath.exists() and filepath.is_file():
             return web.FileResponse(filepath)

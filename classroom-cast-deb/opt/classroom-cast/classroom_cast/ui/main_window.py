@@ -242,6 +242,10 @@ class MainWindow(QMainWindow):
         )
         self._btn_miracast.clicked.connect(self._toggle_miracast)
         self._btn_miracast.setEnabled(self._miracast.available)
+        self._btn_miracast.setToolTip(
+            "安卓手机请使用「班级投屏」APK 客户端\n"
+            "连接热点后浏览器打开大屏 IP 下载"
+        )
         btn_row.addWidget(self._btn_miracast)
 
         self._btn_airplay = QPushButton("📲 苹果投屏")
@@ -475,7 +479,12 @@ class MainWindow(QMainWindow):
         self._update_status("二维码已刷新")
 
     def _toggle_miracast(self):
-        """Toggle Miracast receiver."""
+        """Toggle Miracast receiver — or guide user to use Android APK."""
+        # If Miracast tools aren't available, guide to APK
+        if not self._miracast.available:
+            self._show_android_apk_guide()
+            return
+
         if self._miracast.is_running:
             self._miracast.stop()
             self._btn_miracast.setText("📱 安卓投屏")
@@ -491,6 +500,25 @@ class MainWindow(QMainWindow):
                 self._update_status("Miracast 已启动，等待安卓设备连接...")
             else:
                 self._update_status("Miracast 启动失败（需要系统组件支持）", error=True)
+
+    def _show_android_apk_guide(self):
+        """Show guide for using the Android APK client."""
+        from .network import NetworkManager
+        nm = NetworkManager()
+        ip = nm.primary_ip or "localhost"
+        port = self._config.port
+        msg = (
+            "安卓手机投屏方式：\n\n"
+            "1. 确保手机连接到教室 WiFi 或大屏热点\n"
+            f"2. 在手机浏览器打开 http://{ip}:{port} 下载\n"
+            "   或直接安装「班级投屏」APK\n"
+            "3. 打开 APK，扫码或输入大屏 IP 连接\n"
+            "4. 选择「屏幕镜像」即可投屏\n\n"
+            "注意：Android 系统自带的「无线投屏」\n"
+            "使用 Miracast 协议，与本系统不兼容。\n"
+            "请使用专用的「班级投屏」APK。"
+        )
+        QMessageBox.information(self, "📱 安卓投屏说明", msg)
 
     def _toggle_airplay(self):
         """Toggle AirPlay receiver (advertiser + Uxplay if available)."""
